@@ -63,179 +63,69 @@ with col2:
     st.metric("Rows", sales.shape[0])
     st.metric("Columns", sales.shape[1])
 
-# -------------------------------
-# COLUMN INSIGHTS
-# -------------------------------
-st.header("🔍 Column-Level Insights")
+st.header("🔍 Key Data Insights (Static & Stable)")
 
-datasets = {
-    "Customers": customers,
-    "Sales": sales,
-    "Products": products,
-    "Stores": stores,
-    "Promotion Sales": promo_sales
-}
+# ---------- Customers ----------
+st.subheader("👥 Customers – Spend Distribution")
 
-# Dataset selector (ONE key)
-dataset_name = st.selectbox(
-    "Select dataset to inspect",
-    list(datasets.keys()),
-    key="dataset_selector"
-)
+numeric_cols = customers.select_dtypes(include=np.number).columns
 
-df = datasets[dataset_name]
+if len(numeric_cols) > 0:
+    col = numeric_cols[0]
 
-# Reset column selection when dataset changes
-if "selected_column" not in st.session_state:
-    st.session_state.selected_column = df.columns[0]
-
-if st.session_state.selected_column not in df.columns:
-    st.session_state.selected_column = df.columns[0]
-
-# Column selector (ONE key, globally unique)
-col_name = st.selectbox(
-    "Select a column",
-    df.columns,
-    key="column_selector"
-)
-
-st.write("### Column Summary")
-st.write(df[col_name].describe(include="all"))
-
-if df[col_name].dtype != "object":
-    fig = px.histogram(df, x=col_name, title=f"Distribution of {col_name}")
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    value_counts = df[col_name].value_counts().head(10)
-    fig = px.bar(value_counts, title=f"Top Categories in {col_name}")
+    fig = px.histogram(
+        customers,
+        x=col,
+        nbins=30,
+        title=f"Distribution of {col} (Customers)"
+    )
     st.plotly_chart(fig, use_container_width=True)
 
+    st.write("📌 Insight:")
+    st.write(
+        f"- Most customers are concentrated in a narrow range of `{col}`, "
+        "indicating uneven spending behavior."
+    )
 
-col_name = st.selectbox(
-    "Select a column",
-    df.columns,
-    key=f"column_select_{dataset_name}"
-)
+# ---------- Sales ----------
+st.subheader("🧾 Sales – Volume by Store")
 
+if "store_id" in sales.columns:
+    store_counts = sales["store_id"].value_counts().head(10)
 
-st.write("### Column Summary")
-st.write(df[col_name].describe(include="all"))
-
-if df[col_name].dtype != "object":
-    fig = px.histogram(df, x=col_name, title=f"Distribution of {col_name}")
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    value_counts = df[col_name].value_counts().head(10)
-    fig = px.bar(value_counts, title=f"Top Categories in {col_name}")
-    st.plotly_chart(fig, use_container_width=True)
-
-# -------------------------------
-# LOAD MODELS
-# -------------------------------
-st.header("🤖 Machine Learning Models")
-
-@st.cache_resource
-def load_model(path):
-    return joblib.load(path)
-
-models = {
-    "Linear Regression": load_model("models/lr_model.pkl"),
-    "Random Forest": load_model("models/rf_model.pkl"),
-    "Gradient Boosting": load_model("models/gb_model.pkl")
-}
-
-# -------------------------------
-# MODEL SCORES (STATIC / PRE-COMPUTED)
-# -------------------------------
-model_scores = pd.DataFrame({
-    "Model": ["Linear Regression", "Random Forest", "Gradient Boosting"],
-    "R² Score": [0.62, 0.81, 0.84],
-    "RMSE": [420.5, 260.3, 245.7]
-})
-
-st.subheader("📊 Model Performance Comparison")
-st.dataframe(model_scores, use_container_width=True)
-
-fig = px.bar(
-    model_scores,
-    x="Model",
-    y="R² Score",
-    title="Model Accuracy Comparison"
-)
-st.plotly_chart(fig, use_container_width=True)
-
-# -------------------------------
-# MODEL INSIGHTS
-# -------------------------------
-st.header("🧠 Model Insights")
-
-model_choice = st.selectbox("Select a model", list(models.keys()))
-
-if model_choice == "Linear Regression":
-    st.write("""
-    **Linear Regression**
-    - Assumes linear relationship between features and spend
-    - Easy to interpret
-    - Lower accuracy due to complex customer behavior
-    """)
-
-    coef = models["Linear Regression"].coef_
-    feature_names = customers.select_dtypes(include=np.number).columns[:len(coef)]
-
-    coef_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Impact": coef
-    }).sort_values(by="Impact", ascending=False)
-
-    st.write("### Feature Impact")
-    st.dataframe(coef_df)
-
-elif model_choice == "Random Forest":
-    st.write("""
-    **Random Forest**
-    - Captures non-linear patterns
-    - Robust to noise
-    - Good balance between accuracy and stability
-    """)
-
-    importances = models["Random Forest"].feature_importances_
-    feature_names = customers.select_dtypes(include=np.number).columns[:len(importances)]
-
-    imp_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Importance": importances
-    }).sort_values(by="Importance", ascending=False)
-
-    fig = px.bar(imp_df, x="Feature", y="Importance", title="Feature Importance")
+    fig = px.bar(
+        x=store_counts.index,
+        y=store_counts.values,
+        labels={"x": "Store", "y": "Sales Count"},
+        title="Top 10 Stores by Sales Volume"
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-elif model_choice == "Gradient Boosting":
-    st.write("""
-    **Gradient Boosting**
-    - Best performing model
-    - Learns complex interactions
-    - Slightly harder to interpret
-    """)
+    st.write("📌 Insight:")
+    st.write(
+        "- A small number of stores contribute the majority of sales, "
+        "suggesting location-driven performance differences."
+    )
 
-    importances = models["Gradient Boosting"].feature_importances_
-    feature_names = customers.select_dtypes(include=np.number).columns[:len(importances)]
+# ---------- Promotions ----------
+st.subheader("🏷️ Promotions – Effectiveness")
 
-    imp_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Importance": importances
-    }).sort_values(by="Importance", ascending=False)
+promo_cols = promo_sales.select_dtypes(include=np.number)
 
-    fig = px.bar(imp_df, x="Feature", y="Importance", title="Feature Importance")
+if promo_cols.shape[1] > 0:
+    promo_sum = promo_cols.sum().sort_values(ascending=False)
+
+    fig = px.pie(
+        values=promo_sum.values,
+        names=promo_sum.index,
+        title="Promotion Contribution Breakdown"
+    )
     st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------------
-# FINAL TAKEAWAYS
-# -------------------------------
-st.header("📌 Business Takeaways")
+    st.write("📌 Insight:")
+    st.write(
+        "- Certain promotion types dominate overall sales uplift, "
+        "indicating where marketing budgets should be focused."
+    )
 
-st.markdown("""
-- Customer spend is influenced by **purchase frequency**, **promotion exposure**, and **store behavior**
-- Ensemble models outperform linear approaches
-- Feature distributions reveal spending concentration in a small customer segment
-- Promotions significantly boost short-term spend but vary by product category
-""")
+
